@@ -1,0 +1,237 @@
+---
+title: "Econometrics Project"
+author: "Steven Trochez, Habiba Sultana"
+date: "12/21/2019"
+output: html_document
+---
+---
+title: "Econometrics Project"
+author: "Steven Trochez, Habiba Sultana"
+date: "12/20/2019"
+output: html_document
+---
+#Health condition and behaviors Analysis
+This analysis aims at finding a relationship that links personal metrics (i.e. Race, Sex, Region) with health disparities across the United States. The use of multilinear regression is used to find a linear relationship between the predictors and targets (Chronic Disease, Smoking Habits, Drinking Habits, BMI levels).
+
+The data is extracted from IPUMS/NHIS database. Courtsy of Lynn A. Blewett, Julia A. Rivera Drew, Miriam L. King and Kari C.W. Williams. IPUMS Health Surveys: National Health Interview Survey, Version 6.4 [dataset]. Minneapolis, MN: IPUMS, 2019. https://doi.org/10.18128/D070.V6.4 http://www.nhis.ipums.org
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+```
+
+```{r cars}
+#Installing the neccesarry packages:
+library(data.table)
+library(dplyr)
+library(igraph)
+library(DataExplorer)
+library(jtools)
+library("naniar")
+library(ggplot2)
+library("ipumsr")
+library(AER)
+```
+#Exporting and importing Data:
+The data is accessible through the website (http://www.nhis.ipums.org). The Variables are chosen from a variaty of different options. The variables were chosen based on the requirments of the general question of the analysis.
+```{r}
+# Import the data file from local directory:
+ddi <- read_ipums_ddi("nhis_00007.xml")
+data <- read_ipums_micro(ddi)
+
+#Summary of Data:
+glimpse(data)
+summary(data) 
+```
+#Data Cleaning:
+There are three types of missing data (NIU, unknown-refused, uknown-not ascertined, unknown-don’t know), the data will be subsetted discarding these values.
+```{r}
+## Cleaning Data (Removing NA), Creating  tidy data:
+data1<-replace_with_na(data, replace = list(EDUC=c(000, 996, 997, 998,999),
+                                              RACEA=c(900,970,980,990),
+                                              REGION=c(08,09),
+                                              ASTHMAEV=c(0,7,8,9),
+                                              CHEARTDIEV=c(0,7,8,9),
+                                              ALCSTAT1=c(0,9),
+                                              CIGSDAY=c(00,96,97,98,99),
+                                              VISITYRNO=c(00,96,97,98,99),
+                                              HINOTCOV=c(00,09),
+                                              HEARTCONEV=c(0,7,8,9),
+                                              STROKEV=c(0,7,8,9),
+                                              ARTHLIMIT=c(0,7,8,9),
+                                              DIABETICAGE=c(00,96,97,98,99),
+                                              HEALTH=c(0,7,8,9),
+                                              ALCSTAT1=c(0,9),
+                                              SMOKFREQNOW=c(0,7,8,9),
+                                              ASAD=c(0,6,7,8,9),
+                                              MOD10DTP=c(0,7,8,9),
+                                              HRSLEEP=c(00,97,98,99)))
+                                            
+```
+#SUMMARAZING THE DATA: 
+```{r} 
+summary(data1)
+attach(data1)
+```
+#CREATING MORE DESCRIPTIVE CATEGORIES ACCORDING TO THE IPUMS/NHIS CODEBOOK:
+```{r}
+#REGION:
+REGION <- as.factor(REGION)
+levels(REGION) <- c("Northeast","Midwest","South","West")
+#AGE:
+age<-as.numeric(AGE)
+#SEX:
+female <- as.numeric(SEX == 2)
+#EDUCATION:
+educ_nohs <- as.numeric(EDUC == 200)
+educ_hs <- as.numeric((EDUC > 204) | (EDUC == 301))
+educ_smcoll <- as.numeric(EDUC > 400) & (EDUC == 401)
+educ_as <- as.numeric((EDUC > 402) & (EDUC < 403))
+educ_bach <- as.numeric(EDUC == 500)
+educ_adv <- as.numeric((EDUC > 600) & (EDUC < 603))
+#RACE:
+white <- as.numeric(RACEA == 100)
+black <- as.numeric(RACEA == 200)
+native <- as.numeric(RACEA == 300)
+asian <- as.numeric(RACEA == 410)
+#HEALTH:
+HEALTH <- as.numeric(HEALTH == 1) | (HEALTH == 2) | (HEALTH == 3) | (HEALTH == 4) | (HEALTH == 5)
+#BMI:
+BMI <-as.numeric(BMI)
+#DOCTOR VISITS:
+VISITYRNO <-as.numeric(VISITYRNO > 10) & (VISITYRNO < 40)
+#HEALTH INSURANCE:
+HINOTCOV <-as.numeric(HINOTCOV == 1) | (HINOTCOV == 2)
+#ASTHMA:
+ASTHMAEV <-as.numeric(ASTHMAEV == 2)
+#HEART DISEASE:
+CHEARTDIEV <-as.numeric(CHEARTDIEV == 2)
+#HIGH COLESTEROL:
+CHOLHIGHEV <-as.numeric(CHOLHIGHEV == 2)
+#HEART CONDITION:
+HEARTCONEV <-as.numeric(HEARTCONEV == 2)
+#STROKE:
+STROKEV <-as.numeric(STROKEV == 2)
+#ARTHRITIS:
+ARTHLIMIT <-as.numeric(ARTHLIMIT == 2)
+#AGE DIAGNOSE WITH DIABETES:
+DIABETICAGE <-as.numeric(DIABETICAGE > 01) & (DIABETICAGE < 65)
+#ALCOHOL STATUS:
+ALCSTAT1 <-as.numeric(ALCSTAT1 == 1) | (ALCSTAT1 == 2) | (ALCSTAT1 == 3)
+#NUMBER OF CIGARETTES PER DAY:
+CIGSDAY <-as.numeric(CIGSDAY>01) & (CIGSDAY<20)
+#SMOKE FREQUENCY:
+SMOKFREQNOW <-as.numeric(SMOKFREQNOW == 2) | (SMOKFREQNOW == 3)
+#ACTIVITY DURATION:
+MOD10DTP <-as.numeric(MOD10DTP == 1) | (MOD10DTP == 2)
+#HOURS OF SLEEP PER DAY:
+HRSLEEP <-as.numeric(HRSLEEP>01) & (HRSLEEP<08)
+#HOW OFTEN DO YOU FEEL SAD:
+ASAD <-as.numeric(ASAD>1) & (ASAD<4)
+```
+#CREATING A NEW DATASET:
+```{r}
+newdata <-data.frame(REGION,female,educ_nohs,educ_hs,educ_smcoll,educ_as,educ_bach,educ_adv,white,black,asian,native,HEALTH,VISITYRNO,HINOTCOV,ASTHMAEV,CHEARTDIEV,CHOLHIGHEV,HEARTCONEV,STROKEV,ARTHLIMIT,DIABETICAGE,ALCSTAT1,CIGSDAY,SMOKFREQNOW,MOD10DTP,HRSLEEP,ASAD,YEAR,SERIAL,STRATA,PSU,NHISHID,HHWEIGHT,HHX,PX,PERWEIGHT,SAMPWEIGHT,FWEIGHT,ASTATFLG,CSTATFLG,age,BMI)
+
+detach()
+attach(newdata)
+summary(newdata)
+```
+#INDEXES:
+```{r}
+#EDUCATION AND RACE INDEXES:
+educ_indx <- as.factor(educ_nohs + 2*educ_hs + 3*educ_smcoll + 4*educ_as + 5*educ_bach + 6*educ_adv)
+race_index <-as.factor(white + 2*black)
+```
+#REGRESSION MODELS:
+MODEL1: SEX(female) as the dependent variable
+MODEL2: Education as the dependent variable
+MODEL3: Race as the dependent variable
+```{r}
+attach(newdata)
+
+#Linear Model:
+Model1<-lm(female ~ ASTHMAEV + CHEARTDIEV + HEARTCONEV + STROKEV + ARTHLIMIT + DIABETICAGE + HEALTH + race_index + REGION + factor(educ_hs) + factor(educ_bach) + factor(educ_adv), data = newdata)
+summary(Model1)
+coeftest(Model1)
+exp(Model1$coefficients)
+plot(coef(Model1))
+
+#Logit Model:
+Model1a<-glm(female ~ ASTHMAEV + CHEARTDIEV + HEARTCONEV + STROKEV + ARTHLIMIT + DIABETICAGE  + race_index + REGION + factor(educ_hs) + factor(educ_bach) + factor(educ_adv), family = binomial, data = newdata)
+summary(Model1a)
+coeftest(Model1a)
+exp(Model1a$coefficients)
+plot(coef(Model1a))
+
+#Probit Model:
+Model1b<-glm(female ~ ASTHMAEV + CHEARTDIEV + HEARTCONEV + STROKEV + ARTHLIMIT + DIABETICAGE + HEALTH + race_index + REGION + factor(educ_hs) + factor(educ_bach) + factor(educ_adv), family = binomial(link = "probit"), data = newdata)
+summary(Model1b)
+coeftest(Model1b)
+exp(Model1b$coefficients)
+plot(coef(Model1b))
+```
+```{r}
+#Linear Model:
+Model2<-lm(female ~ race_index + factor(educ_hs) + factor(educ_bach) + factor(educ_adv) + ASTHMAEV + CHEARTDIEV + HEARTCONEV + STROKEV + ARTHLIMIT + DIABETICAGE + HEALTH)
+summary(Model2)
+coeftest(Model2)
+exp(Model2$coefficients)
+plot(coef(Model2))
+
+#Logit Model:
+Model2a<-glm(female ~ race_index + factor(educ_hs) + factor(educ_bach) + factor(educ_adv) + ASTHMAEV + CHEARTDIEV + HEARTCONEV + STROKEV + ARTHLIMIT + DIABETICAGE + HEALTH,family = binomial, data = newdata)
+summary(Model2a)
+coeftest(Model2a)
+exp(Model2a$coefficients)
+plot(coef(Model2a))
+
+#Probit Model:
+Model2b<-glm(female ~ race_index + factor(educ_hs) + factor(educ_bach) + factor(educ_adv) + ASTHMAEV + CHEARTDIEV + HEARTCONEV + STROKEV + ARTHLIMIT + DIABETICAGE + HEALTH, family = binomial(link = "probit"), data = newdata)
+summary(Model2b)
+coeftest(Model2b)
+exp(Model2b$coefficients)
+plot(coef(Model2b))
+```
+
+```{r}
+#Linear Model:
+Model3<-lm(female ~ factor(race_index) + factor(educ_hs) + factor(educ_bach) + factor(educ_adv) + ASTHMAEV + CHEARTDIEV + HEARTCONEV + STROKEV + ARTHLIMIT + DIABETICAGE + CIGSDAY + HRSLEEP + VISITYRNO + BMI + factor(REGION))
+summary(Model3)
+coeftest(Model3)
+exp(Model3$coefficients)
+plot(coef(Model3))
+
+#Logit Model:
+Model3a<-glm(female ~ factor(race_index) + factor(educ_hs) + factor(educ_bach) + factor(educ_adv) + ASTHMAEV + CHEARTDIEV + HEARTCONEV + STROKEV + ARTHLIMIT + DIABETICAGE + CIGSDAY + HRSLEEP + VISITYRNO + BMI, family = binomial, data = newdata)
+summary(Model3a)
+coeftest(Model3a)
+exp(Model3a$coefficients)
+plot(coef(Model3a))
+
+#Probit Model:
+Model3b<-glm(female ~ factor(race_index) + factor(educ_hs) + factor(educ_bach) + factor(educ_adv) + ASTHMAEV + CHEARTDIEV + HEARTCONEV + STROKEV + ARTHLIMIT + DIABETICAGE + CIGSDAY + HRSLEEP + VISITYRNO + BMI, family = binomial(link = "probit"), data = newdata)
+summary(Model3b)
+coeftest(Model3b)
+exp(Model3b$coefficients)
+plot(coef(Model3b))
+```
+
+#ANOVA TEST:
+```{r}
+#MODEL 1 ANOVA:
+anova(Model1)
+anova(Model1a)
+anova(Model1b)
+
+#MODEL 2 ANOVA:
+anova(Model2)
+anova(Model2a)
+anova(Model2b)
+
+#MODEL 3 ANOVA:
+anova(Model3)
+anova(Model3a)
+anova(Model3b)
+```
